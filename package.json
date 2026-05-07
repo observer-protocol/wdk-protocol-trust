@@ -1,0 +1,77 @@
+{
+  "name": "@observer-protocol/wdk-protocol-trust",
+  "version": "0.1.0-beta.1",
+  "description": "WDK protocol module: agent identity, bilateral trust handshake, and ERC-8004 payment attestation via Observer Protocol",
+  "keywords": [
+    "wdk",
+    "protocol",
+    "trust",
+    "agent-identity",
+    "kya",
+    "know-your-agent",
+    "did-web",
+    "verifiable-credentials",
+    "erc-8004",
+    "observer-protocol",
+    "agentic-economy"
+  ],
+  "author": "Observer Protocol, Inc.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/observer-protocol/wdk-protocol-trust.git"
+  },
+  "homepage": "https://observerprotocol.org",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "build:types": "tsc",
+    "lint": "standard",
+    "lint:fix": "standard --fix",
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --coverage",
+    "example": "node examples/full-flow.mjs"
+  },
+  "peerDependencies": {
+    "@tetherto/wdk-wallet": "^1.0.0-beta.7",
+    "@tetherto/wdk-wallet-evm": "^1.0.0-beta.8"
+  },
+  "dependencies": {
+    "@noble/curves": "^1.6.0",
+    "@noble/hashes": "^1.5.0",
+    "bare-node-runtime": "^1.1.4"
+  },
+  "devDependencies": {
+    "@tetherto/wdk-wallet": "1.0.0-beta.7",
+    "@tetherto/wdk-wallet-evm": "1.0.0-beta.8",
+    "cross-env": "10.0.0",
+    "jest": "30.0.5",
+    "standard": "17.1.2",
+    "typescript": "5.8.3"
+  },
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "bare": "./bare.js",
+      "default": "./index.js"
+    },
+    "./protocols": {
+      "types": "./types/src/trust-protocol.d.ts",
+      "default": "./src/trust-protocol.js"
+    },
+    "./package": {
+      "default": "./package.json"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "standard": {
+    "ignore": [
+      "bare.js",
+      "tests/**/*.js",
+      "examples/**/*.mjs"
+    ]
+  }
+}

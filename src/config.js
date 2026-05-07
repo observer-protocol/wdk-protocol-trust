@@ -1,0 +1,51 @@
+// Copyright 2026 Observer Protocol, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+'use strict'
+
+/**
+ * Default Observer Protocol API base URL. Override via TrustProtocolConfig.apiBase.
+ *
+ * @type {string}
+ */
+export const DEFAULT_API_BASE = 'https://api.observerprotocol.org'
+
+/**
+ * BIP-32 derivation path for the agent's Ed25519 signing key, derived from the
+ * wallet seed. Domain-separated under purpose 7000 to avoid collision with
+ * BIP-44 coin types (44'/0' Bitcoin, 44'/60' Ethereum, etc).
+ *
+ * The path is "m/7000'/0'/0'/0/0" — fixed for v1. Subsequent agents from the
+ * same wallet seed (multi-agent support) will increment the last index.
+ *
+ * @type {string}
+ */
+export const DEFAULT_DID_DERIVATION_PATH = "m/7000'/0'/0'/0/0"
+
+/**
+ * Default request timeout for OP API calls (milliseconds).
+ *
+ * @type {number}
+ */
+export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000
+
+/**
+ * Identifier prefix for the OP DID method. All agents have DIDs of the form
+ * `did:web:observerprotocol.org:agents:{agent_id}`.
+ *
+ * @type {string}
+ */
+export const DID_PREFIX = 'did:web:observerprotocol.org:agents:'
+
+/**
+ * Verification method type for Ed25519 keys in DID documents, per W3C
+ * `Ed25519Signature2020` cryptosuite.
+ *
+ * @type {string}
+ */
+export const VERIFICATION_METHOD_TYPE = 'Ed25519VerificationKey2020'
