@@ -259,7 +259,7 @@ This produces:
 
 - **Agent DID** of the form `did:web:observerprotocol.org:agents:{agent_id}`. Resolvable by any W3C-compliant resolver (`dev.uniresolver.io`, `gossipsub-did-resolver`, etc).
 - **DID document** containing the agent's public key in multibase base58btc format (`z6Mk...` per `Ed25519VerificationKey2020`).
-- **Signature suite**: Ed25519Signature2020 throughout (matches Observer Protocol's default).
+- **Signature suite**: Ed25519Signature2026 (AIP v0.6 default; dual-accepted alongside the legacy `Ed25519Signature2020` label during the migration window).
 
 The derivation is domain-separated under purpose `7000` to avoid collision with BIP-44 paths. **One wallet, one stable agent identity** — resetting state and re-deriving produces the same DID.
 

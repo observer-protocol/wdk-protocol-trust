@@ -43,8 +43,15 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000
 export const DID_PREFIX = 'did:web:observerprotocol.org:agents:'
 
 /**
- * Verification method type for Ed25519 keys in DID documents, per W3C
- * `Ed25519Signature2020` cryptosuite.
+ * Verification method type for Ed25519 keys in DID documents.
+ *
+ * Note: the constant value `Ed25519VerificationKey2020` is the W3C
+ * verification-method type and is independent of the signature suite name.
+ * AIP v0.6 renamed the signature suite from `Ed25519Signature2020` to
+ * `Ed25519Signature2026` (the W3C `2020` suite implies URDNA2015
+ * canonicalization; OP uses JCS-style, so the year-stamp is neutral).
+ * This package does not consume the signature suite name directly —
+ * verification is via challenge-response, not credential-proof parsing.
  *
  * @type {string}
  */
