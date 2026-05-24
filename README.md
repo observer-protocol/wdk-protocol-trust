@@ -326,6 +326,18 @@ import { verifyPreimage } from '@observer-protocol/wdk-lightning-verifier'
 
 ---
 
+## Related WDK modules
+
+This is one of several Observer Protocol modules for the Tether [WDK](https://github.com/tetherto/wdk) ecosystem:
+
+- **[@observer-protocol/wdk-policy](https://github.com/observer-protocol/wdk-policy)** — delegation-scoped policy enforcement (per AIP v0.8).
+- **[@observer-protocol/wdk-protocol-trust](https://github.com/observer-protocol/wdk-protocol-trust)** — agent identity + bilateral trust handshake. *(this module)*
+- **[@observer-protocol/wdk-lightning-verifier](https://github.com/observer-protocol/wdk-lightning-verifier)** — verifiable Lightning payments + reputation attribution.
+
+See [observer-protocol/wdk-modules](https://github.com/observer-protocol/wdk-modules) for the full index.
+
+---
+
 ## License
 
 Apache-2.0 © 2026 Observer Protocol, Inc.
