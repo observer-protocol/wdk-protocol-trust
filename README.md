@@ -2,7 +2,7 @@
 
 > WDK protocol module: agent identity, bilateral trust handshake, and ERC-8004 payment attestation via Observer Protocol.
 
-**Note**: This package is currently in beta (`0.1.0-beta.1`). The four protocol methods are implemented and verified against the live Observer Protocol mainnet API; the underlying protocol surface (AIP v0.5) is itself in pre-1.0. Test thoroughly in development before production use.
+**Note**: This package is currently in beta (`0.1.0-beta.1`). The four protocol methods are implemented and verified against the live Observer Protocol mainnet API; the underlying protocol surface (AIP v0.6 draft) is itself pre-1.0. Test thoroughly in development before production use.
 
 ---
 

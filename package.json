@@ -1,6 +1,6 @@
 {
   "name": "@observer-protocol/wdk-protocol-trust",
-  "version": "0.2.0-beta.1",
+  "version": "0.1.0-beta.1",
   "description": "WDK protocol module: agent identity, bilateral trust handshake, and ERC-8004 payment attestation via Observer Protocol",
   "keywords": [
     "wdk",
