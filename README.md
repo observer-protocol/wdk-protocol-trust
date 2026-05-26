@@ -12,7 +12,7 @@ WDK gives agents wallets. It doesn't give agents **identity**. Two agents with W
 
 This module fills that gap. It binds a WDK wallet account to a W3C `did:web` agent identity registered on Observer Protocol. Before a payment, both parties' identities are cryptographically verified through a bilateral handshake. After settlement, the payment is attested to a permanent registry — including, optionally, ERC-8004 chain anchoring. The full path from "I have a WDK wallet" to "I have a verifiable agent operating in machine commerce" is four method calls.
 
-Observer Protocol provides the open identity, attestation, and revocation infrastructure ([whitepaper v1.3.1](https://observerprotocol.org/papers/observer-protocol-whitepaper-v1.3.1.pdf), [AIP v0.5 spec](https://observerprotocol.org/papers/aip-v0.5.pdf)). This module is the WDK-shaped surface to it.
+Observer Protocol provides the open identity, attestation, and revocation infrastructure ([technical paper](https://observerprotocol.org/papers/technical-paper), [AIP v0.6 draft spec](https://github.com/observer-protocol/aip/blob/main/aip-v0.6-draft-1.md)). This module is the WDK-shaped surface to it.
 
 ---
 
@@ -309,16 +309,10 @@ import { verifyPreimage } from '@observer-protocol/wdk-lightning-verifier'
 
 ---
 
-## Publication status
-
-> This package is in active development. The canonical home is `observer-protocol/wdk-protocol-trust` (or the personal account fallback during organization access transitions). Once organization access stabilizes, all references will resolve to the canonical org URL.
-
----
-
 ## Links
 
 - **Observer Protocol:** [observerprotocol.org](https://observerprotocol.org)
-- **AIP v0.5 specification:** [observerprotocol.org/papers/aip-v0.5.pdf](https://observerprotocol.org/papers/aip-v0.5.pdf)
+- **AIP v0.6 draft specification:** [github.com/observer-protocol/aip](https://github.com/observer-protocol/aip/blob/main/aip-v0.6-draft-1.md)
 - **OP API documentation:** [api.observerprotocol.org/docs](https://api.observerprotocol.org/docs)
 - **Lightning verifier (companion package):** `@observer-protocol/wdk-lightning-verifier`
 - **WDK ecosystem:** [docs.wallet.tether.io](https://docs.wallet.tether.io)
