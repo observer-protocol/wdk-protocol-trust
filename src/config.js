@@ -56,3 +56,13 @@ export const DID_PREFIX = 'did:web:observerprotocol.org:agents:'
  * @type {string}
  */
 export const VERIFICATION_METHOD_TYPE = 'Ed25519VerificationKey2020'
+
+/**
+ * Default trusted-issuer DID set for the AIP v0.8 mandate surface.
+ * Override via ObserverTrustOptions.trustedIssuers in user code.
+ *
+ * @type {ReadonlyArray<string>}
+ */
+export const DEFAULT_TRUSTED_ISSUERS = Object.freeze([
+  'did:web:observerprotocol.org'
+])

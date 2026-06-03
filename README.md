@@ -1,8 +1,8 @@
 # @observer-protocol/wdk-protocol-trust
 
-> WDK protocol module: agent identity, bilateral trust handshake, and ERC-8004 payment attestation via Observer Protocol.
+> WDK protocol module: agent identity, bilateral trust handshake, AIP v0.8 spending-mandate verification, and ERC-8004-anchored settlement attestation via Observer Protocol.
 
-**Note**: This package is currently in beta (`0.1.0-beta.1`). The four protocol methods are implemented and verified against the live Observer Protocol mainnet API; the underlying protocol surface (AIP v0.6 draft) is itself pre-1.0. Test thoroughly in development before production use.
+**Note**: This package is currently in beta (`0.2.0-beta.1`). The earlier handshake methods (`register`, `verify(alias)`, `bilateralVerify`, `attestPayment`) ship alongside the AIP v0.8 mandate surface (`verifyMandate`, `withinScope`, `attest`, `PolicyGate`) added in this release. The underlying protocol (AIP v0.8 draft-1) is itself pre-1.0. Test thoroughly in development before production use.
 
 ---
 
@@ -32,6 +32,82 @@ This package proposes `TrustProtocol` as that fifth category, structured identic
 The strategic claim: trust is **architecturally orthogonal** to bridge / swap / fiat / lending. None of the existing four cover "is this counterparty who they claim to be, and what's their settlement history". As autonomous agent commerce moves from human-in-the-loop transactions to fully autonomous, that orthogonal axis becomes load-bearing — chargeback prevention, KYA compliance for institutional flows, reputation portability across rails. It earns its own protocol category.
 
 We're shipping this independently because we have something to ship now, not because we want to fork. If the architecture lands cleanly under Tether's ownership long-term, that's the right outcome.
+
+---
+
+## AIP v0.8 mandate surface (new in 0.2.0)
+
+The mandate surface lets a WDK agent **verify** a delegation credential issued under [AIP v0.8](https://github.com/observer-protocol/aip), **gate** a proposed spend against the verified mandate, and **attest** the settlement — all without OP touching funds. Four method calls, no new dependencies:
+
+```javascript
+import ObserverTrustProtocol from '@observer-protocol/wdk-protocol-trust'
+
+const op = new ObserverTrustProtocol(wallet, {
+  trustedIssuers: ['did:web:observerprotocol.org'],
+  attestationKey,   // DISTINCT from the WDK wallet key
+  // gate: optional — defaults to AdvisoryGate (client-side gating)
+})
+
+const mandate  = await op.verifyMandate(agentCredential)        // did:web + Ed25519Signature2026 + schema-allowlist + validity
+const decision = await op.withinScope(proposedAction, mandate)  // per-tx ceiling + rail + category + authz-level rules
+if (!decision.allow) throw new Error('mandate violation: ' + JSON.stringify(decision.reasons))
+
+const tx = await wallet.send(/* … */)                           // WDK executes; OP never touches funds
+await op.attest({ credential: agentCredential, action: proposedAction, settlement: { rail: 'usdt_tron', ref: tx.id } })
+```
+
+A runnable end-to-end example with a self-issued demo credential and stub wallet: [`examples/mandate-flow.mjs`](./examples/mandate-flow.mjs). Run it with `npm run example`.
+
+### Design invariants
+
+These are load-bearing — they shape the API and they shape what this adapter will and won't do:
+
+- **OP attests authorization; it never settles or moves funds.** WDK / the rail is the source of truth for the transaction fact. Every surface, label, and return field reflects this.
+- **`withinScope` is I/O-free.** No FX, no oracles, no HTTP, no chain RPCs, no database calls. Input is `(proposedAction, mandate)`; output is `{allow, reasons, advisories}`. Importing settlement truth into the evaluator would cross the verify-don't-settle line.
+- **Same-currency amount checks only.** A currency mismatch is a deny with reason, never a conversion. Per-rail ceilings follow naturally — each rail's natural unit differs.
+- **Per-transaction ceiling is the only binding amount check.** `cumulative_budget` is **advisory only** in v0.8: declared in the credential, surfaced in the verifier result, never grounds a deny. Same for `allowed_counterparty_types` and `geographic_restriction` — reserved with constrained shapes and explicit advisory normative status, until the substrate source-of-truth for each is defined.
+- **Schema allowlist, not arbitrary fetch.** This adapter recognises `credentialSchema.id = https://observerprotocol.org/schemas/delegation/v2.1.json`. Unknown URLs are rejected; the adapter does not fetch arbitrary schema URLs. The earlier `v2.json` URL (frozen at AIP v0.7-era content for the maxi-0001 demo) is **deliberately excluded** — its older `cumulative_ceiling` / `period` vocabulary does not match this adapter's logic. See `SCHEMA_POLICY.md` in `observer-protocol/aip` for the schema immutability policy.
+- **`PolicyGate` is the seam to Tether WDK PR #55.** The default `AdvisoryGate` runs `withinScope` client-side — the developer's `throw` gates the call. `WdkPolicyHookGate` is stubbed until PR #55 (or its successor) lands and the in-WDK pre-sign hook is final; at that point the gate will honour the decision inside the WDK transaction path itself.
+
+### `verifyMandate(credential, opts?)`
+
+Does:
+
+1. Shape validation (required fields present).
+2. `credentialSchema.id` in `SCHEMA_ALLOWLIST` (default: `['https://observerprotocol.org/schemas/delegation/v2.1.json']`). Pass `opts.schemaAllowlist` or `config.schemaAllowlist` to extend.
+3. Issuer in `trustedIssuers`.
+4. `validFrom ≤ now ≤ validUntil`.
+5. `did:web` resolution of the issuer.
+6. `Ed25519Signature2026` proof verification bound to an `assertionMethod` key in the issuer DID document.
+
+Returns a typed `Mandate` (`{credentialId, issuer, subjectDid, validFrom, validUntil, authorizationLevel, authorizationConfig, actionScope, credentialSchemaId, raw}`). Throws `VerificationError` with a machine-readable `code` on any failure.
+
+Status-list (revocation) checking is intentionally NOT performed in v1; layer it on top if you need it.
+
+### `withinScope(action, mandate)`
+
+Pure evaluator. Binding deny rules:
+
+- `proposed.rail ∈ actionScope.allowed_rails`
+- `proposed.amount.currency === per_transaction_ceiling.currency` AND `proposed.amount.amount ≤ ceiling.amount` (decimal-string compare, no float)
+- `proposed.category ∈ actionScope.allowed_transaction_categories` (when the list is present)
+- `authorizationLevel`-gated rules from `authorizationConfig` (`one-time` / `recurring` / `policy`)
+
+Advisory surfacing (returned in `decision.advisories`, never `decision.reasons`):
+
+- `cumulative_budget` declared
+- `allowed_counterparty_types` declared
+- `geographic_restriction` declared
+- `recurring.period` declared (stateful — no in-adapter state)
+- `policy.time_windows` / `escalation_threshold` / `fallback_rules` declared
+
+### `attest({credential, action, settlement})`
+
+Builds and signs an `ObserverSettlementAttestation` binding the delegation (by SHA-256 of its JCS-canonical bytes, plus the issuer's `proofValue`), the action, the settlement reference, this adapter as evaluator, and a timestamp. Signed by the agent's `attestationKey` using `Ed25519Signature2026`.
+
+Optional ERC-8004 anchoring is gated by `config.erc8004` (a stub-compatible anchorer with an `anchor()` method). Pass `args.anchor: true` to invoke; the anchor reference lands inside `credentialSubject.settlement.anchored` before signing, so the binding is part of the signed envelope.
+
+`attestationKey` MUST be distinct from the WDK wallet key in production — pass it via `config.attestationKey`. The wallet-derived fallback is for early development only.
 
 ---
 

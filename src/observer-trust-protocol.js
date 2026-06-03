@@ -17,7 +17,11 @@ import {
   buildDidDocument,
   signChallenge
 } from './did-utils.js'
-import { DEFAULT_DID_DERIVATION_PATH } from './config.js'
+import { DEFAULT_DID_DERIVATION_PATH, DEFAULT_TRUSTED_ISSUERS } from './config.js'
+import { SCHEMA_ALLOWLIST } from './schema-allowlist.js'
+import { verifyMandate as _verifyMandate } from './credential-verify.js'
+import { AdvisoryGate } from './policy-gate.js'
+import { buildSettlementAttestation } from './attestation.js'
 
 /** @typedef {import('./trust-protocol.js').TrustProtocolConfig} TrustProtocolConfig */
 /** @typedef {import('./trust-protocol.js').RegisterOptions} RegisterOptions */
@@ -67,6 +71,27 @@ export default class ObserverTrustProtocol extends TrustProtocol {
     this._derivationPath = config.didDerivationPath || DEFAULT_DID_DERIVATION_PATH
     /** @private — populated lazily on first register/sign call */
     this._identity = null
+    /** @private — AIP v0.8 mandate-surface options */
+    this._trustedIssuers = Array.isArray(config.trustedIssuers) && config.trustedIssuers.length > 0
+      ? Object.freeze([...config.trustedIssuers])
+      : DEFAULT_TRUSTED_ISSUERS
+    /** @private */
+    this._schemaAllowlist = Array.isArray(config.schemaAllowlist) && config.schemaAllowlist.length > 0
+      ? Object.freeze([...config.schemaAllowlist])
+      : SCHEMA_ALLOWLIST
+    /** @private */
+    this._gate = config.gate || new AdvisoryGate()
+    /**
+     * @private
+     * Optional separate attestation key (Uint8Array of length 32, raw
+     * Ed25519 secret). When unset, attest() derives one from the wallet
+     * seed under the same derivation path as the agent DID key — but the
+     * brief calls for this to be DISTINCT from the WDK wallet key in
+     * production. Pass `config.attestationKey` to honour that separation.
+     */
+    this._attestationKey = config.attestationKey || null
+    /** @private */
+    this._erc8004 = config.erc8004 || null
   }
 
   /**
@@ -292,6 +317,125 @@ export default class ObserverTrustProtocol extends TrustProtocol {
     }
 
     return result
+  }
+
+  // ── AIP v0.8 mandate surface ────────────────────────────────────────────
+
+  /**
+   * Verify an `ObserverDelegationCredential` against the AIP v0.8 mandate
+   * surface. Does: shape validation, credentialSchema.id allowlist check,
+   * trusted-issuer check, validity-window check, did:web resolution, and
+   * Ed25519Signature2026 proof verification bound to an assertionMethod
+   * key in the issuer DID document.
+   *
+   * Status-list (revocation) checking is intentionally NOT performed here
+   * in v1; callers requiring revocation SHOULD layer it on top.
+   *
+   * Distinct from {@link verify} (the v0.5-era handshake against a string
+   * alias). Both methods coexist; use the one that matches your flow.
+   *
+   * @param {object} credential
+   * @param {{nowMs?: number, resolveDid?: (did: string) => Promise<object>}} [opts]
+   * @returns {Promise<import('./mandate-types.js').Mandate>}
+   */
+  async verifyMandate (credential, opts = {}) {
+    return _verifyMandate(credential, {
+      trustedIssuers: this._trustedIssuers,
+      schemaAllowlist: this._schemaAllowlist,
+      nowMs: opts.nowMs,
+      resolveDid: opts.resolveDid
+    })
+  }
+
+  /**
+   * Evaluate a proposed action against a verified mandate. Pure and
+   * I/O-free per the Observer Protocol evaluator source-of-truth invariant.
+   *
+   * Delegates to the configured `PolicyGate`. The default {@link AdvisoryGate}
+   * runs `withinScope` client-side; a future `WdkPolicyHookGate` (post-WDK
+   * PR #55) will adapt to the in-WDK pre-sign hook.
+   *
+   * @param {import('./mandate-types.js').ProposedAction} action
+   * @param {import('./mandate-types.js').Mandate} mandate
+   * @returns {Promise<import('./mandate-types.js').Decision> | import('./mandate-types.js').Decision}
+   */
+  withinScope (action, mandate) {
+    return this._gate.evaluate(action, mandate)
+  }
+
+  /**
+   * Sign an `ObserverSettlementAttestation` binding {delegation credential,
+   * proposed action, settlement reference, evaluator, timestamp} with the
+   * agent's attestation key. The signed envelope is portable: any verifier
+   * with the agent DID can independently check that the agent attested to
+   * this exact (mandate, action, settlement) tuple.
+   *
+   * `attestationKey` MUST be distinct from the WDK wallet key in
+   * production — pass it via `config.attestationKey` on the constructor.
+   * If not supplied, this method falls back to the wallet-seed-derived
+   * key (the same key used for OP API challenge-response); the fallback
+   * is for early-development only and emits no warning.
+   *
+   * Optional ERC-8004 anchoring is gated by `config.erc8004` (a stub-
+   * compatible anchorer object with an `anchor(attestation)` method).
+   * If `args.anchor === true` and an anchorer is configured, the call is
+   * awaited and the returned anchor reference is added to the attestation's
+   * `credentialSubject.settlement.anchored` field BEFORE signing.
+   *
+   * @param {{
+   *   credential: object,
+   *   action: import('./mandate-types.js').ProposedAction,
+   *   settlement: {rail: string, ref: string} | string,
+   *   anchor?: boolean
+   * }} args
+   * @returns {Promise<object>} The signed attestation envelope.
+   */
+  async attest (args) {
+    if (!args || typeof args !== 'object') {
+      throw new TypeError('attest(args): args required')
+    }
+    const identity = await this._ensureIdentity()
+    const attestationKey = this._attestationKey || identity.privateKey
+    const issuerDid = identity.did || this._derivedDidFromKeypair(identity)
+    const verificationMethod = `${issuerDid}#key-1`
+
+    /** @type {object | null} */
+    let anchored = null
+    if (args.anchor === true && this._erc8004 && typeof this._erc8004.anchor === 'function') {
+      anchored = await this._erc8004.anchor({
+        credential: args.credential,
+        action: args.action,
+        settlement: args.settlement
+      })
+    }
+
+    let settlementWithAnchor = args.settlement
+    if (anchored) {
+      const base = typeof args.settlement === 'string'
+        ? { rail: args.action.rail, ref: args.settlement }
+        : { rail: args.settlement.rail, ref: args.settlement.ref }
+      settlementWithAnchor = { ...base, anchored: { erc8004: anchored } }
+    }
+
+    return buildSettlementAttestation({
+      credential: args.credential,
+      action: args.action,
+      settlement: settlementWithAnchor,
+      attestationKey,
+      verificationMethod,
+      issuerDid,
+      subjectDid: issuerDid
+    })
+  }
+
+  /**
+   * @private
+   * @param {{publicKey: Uint8Array, did: string|null}} identity
+   * @returns {string}
+   */
+  _derivedDidFromKeypair (identity) {
+    const agentId = deriveAgentId(identity.publicKey)
+    return buildDid(agentId)
   }
 
   // ── internals ────────────────────────────────────────────────────────────

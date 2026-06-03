@@ -33,6 +33,24 @@ export {
   DEFAULT_API_BASE,
   DEFAULT_DID_DERIVATION_PATH,
   DEFAULT_REQUEST_TIMEOUT_MS,
+  DEFAULT_TRUSTED_ISSUERS,
   DID_PREFIX,
   VERIFICATION_METHOD_TYPE
 } from './src/config.js'
+
+// ── AIP v0.8 mandate surface ──────────────────────────────────────────────
+export { SCHEMA_ALLOWLIST, isAllowedSchema } from './src/schema-allowlist.js'
+export { withinScope } from './src/mandate.js'
+export { PolicyGate, AdvisoryGate, WdkPolicyHookGate } from './src/policy-gate.js'
+export {
+  VerificationError,
+  verifyMandate,
+  canonicalizeForSigning,
+  resolveDidWeb,
+  verifyCredentialProof,
+  findAssertionMethod,
+  decodePublicKeyMultibase,
+  decodeSignatureMultibase,
+  base58Decode
+} from './src/credential-verify.js'
+export { buildSettlementAttestation } from './src/attestation.js'
