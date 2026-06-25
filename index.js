@@ -41,7 +41,8 @@ export {
 // ── AIP v0.8 mandate surface ──────────────────────────────────────────────
 export { SCHEMA_ALLOWLIST, isAllowedSchema } from './src/schema-allowlist.js'
 export { withinScope } from './src/mandate.js'
-export { PolicyGate, AdvisoryGate, WdkPolicyHookGate } from './src/policy-gate.js'
+export { PolicyGate, AdvisoryGate } from './src/policy-gate.js'
+export { WdkEnforcementGate } from './src/wdk-enforcement-gate.js'
 export {
   VerificationError,
   verifyMandate,
@@ -54,3 +55,12 @@ export {
   base58Decode
 } from './src/credential-verify.js'
 export { buildSettlementAttestation } from './src/attestation.js'
+
+// ── did:key creation and document building ────────────────────────────────
+export { createDidKeyAgent, buildDidKeyDocument } from './src/did-key.js'
+
+// ── document signing and verification (Ed25519Signature2026 / JCS) ────────
+export { signDocument, verifyDocument } from './src/proof.js'
+
+// ── delegation schema constant ────────────────────────────────────────────
+export { DELEGATION_SCHEMA_V2_1 } from './src/config.js'

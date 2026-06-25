@@ -66,3 +66,12 @@ export const VERIFICATION_METHOD_TYPE = 'Ed25519VerificationKey2020'
 export const DEFAULT_TRUSTED_ISSUERS = Object.freeze([
   'did:web:observerprotocol.org'
 ])
+
+/**
+ * The current, allowlisted AIP v0.8 delegation schema (frozen URL).
+ * Per schema immutability policy: every schema change gets a new URL;
+ * this version is frozen forever once published.
+ *
+ * @type {string}
+ */
+export const DELEGATION_SCHEMA_V2_1 = 'https://observerprotocol.org/schemas/delegation/v2.1.json'
