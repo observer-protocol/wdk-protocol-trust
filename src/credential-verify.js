@@ -9,6 +9,7 @@
 'use strict'
 
 import { ed25519 } from '@noble/curves/ed25519'
+import { sha256 } from '@noble/hashes/sha256'
 
 import { DEFAULT_TRUSTED_ISSUERS, DEFAULT_REQUEST_TIMEOUT_MS } from './config.js'
 import { SCHEMA_ALLOWLIST, isAllowedSchema } from './schema-allowlist.js'
@@ -38,16 +39,38 @@ export class VerificationError extends Error {
 }
 
 /**
- * Canonicalize a credential for signing/verifying. Matches the Sovereign
- * issuer's canonicalization exactly: exclude the `proof` field, recursively
- * sort object keys lexicographically, JSON.stringify with no whitespace.
+ * RFC 8785 JSON Canonicalization Scheme — sort object keys by UTF-16 code
+ * unit order, compact-stringify. Arrays preserve their element order.
+ * `undefined` values in arrays become `null`; `undefined` object members are
+ * omitted (mirrors JSON.stringify behaviour).
  *
- * Note: this is not full RFC 8785 JCS — it is the sort-keys-and-compact
- * subset, which matches the Python `json.dumps(..., sort_keys=True,
- * separators=(',', ':'))` used in the reference issuer. The two MUST stay
- * byte-identical; if the issuer ever switches to full RFC 8785, this
- * function moves with it via a new schema URL (per the schema immutability
- * policy).
+ * Used as the JCS step in eddsa-jcs-2022 proof construction and verification.
+ *
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function jcsCanonicalize (value) {
+  if (value === null || typeof value !== 'object') {
+    if (value === undefined) throw new TypeError('jcsCanonicalize: undefined is not representable in JSON')
+    return JSON.stringify(value)
+  }
+  if (Array.isArray(value)) {
+    return '[' + value.map(v => jcsCanonicalize(v === undefined ? null : v)).join(',') + ']'
+  }
+  const keys = Object.keys(value).sort()
+  const parts = []
+  for (const k of keys) {
+    const v = value[k]
+    if (v === undefined) continue
+    parts.push(JSON.stringify(k) + ':' + jcsCanonicalize(v))
+  }
+  return '{' + parts.join(',') + '}'
+}
+
+/**
+ * Canonicalize a credential for signing/verifying: exclude the `proof` field,
+ * then apply RFC 8785 JCS (sorted keys, compact JSON). This is the `unsecured
+ * document` input to the eddsa-jcs-2022 proof algorithm.
  *
  * @param {object} credential
  * @returns {string}
@@ -60,23 +83,7 @@ export function canonicalizeForSigning (credential) {
   for (const [k, v] of Object.entries(credential)) {
     if (k !== 'proof') withoutProof[k] = v
   }
-  return JSON.stringify(_sortKeysRecursive(withoutProof))
-}
-
-/**
- * @private
- * @param {*} value
- * @returns {*}
- */
-function _sortKeysRecursive (value) {
-  if (Array.isArray(value)) return value.map(_sortKeysRecursive)
-  if (value !== null && typeof value === 'object') {
-    const keys = Object.keys(value).sort()
-    const out = {}
-    for (const k of keys) out[k] = _sortKeysRecursive(value[k])
-    return out
-  }
-  return value
+  return jcsCanonicalize(withoutProof)
 }
 
 /**
@@ -237,8 +244,15 @@ export function findAssertionMethod (didDocument, verificationMethodId) {
 }
 
 /**
- * Verify the W3C VC proof on a credential. Returns true on success; throws
- * `VerificationError` with a machine-readable code on failure.
+ * Verify the W3C VC Data Integrity proof (DataIntegrityProof / eddsa-jcs-2022)
+ * on a credential. Returns true on success; throws `VerificationError` with a
+ * machine-readable code on failure.
+ *
+ * Hash construction (W3C VC Data Integrity EdDSA Cryptosuites §3.3):
+ *   hashData = SHA-256(JCS(proofConfig)) ‖ SHA-256(JCS(unsecuredDocument))
+ *
+ * Legacy suites (Ed25519Signature2020/2026) are hard-rejected — Observer
+ * Protocol migrated to eddsa-jcs-2022 in 2026-06.
  *
  * @param {object} credential
  * @param {object} didDocument
@@ -252,8 +266,17 @@ export function verifyCredentialProof (credential, didDocument) {
   if (!proof || typeof proof !== 'object') {
     throw new VerificationError('proof_missing', 'credential.proof missing or malformed')
   }
-  if (proof.type !== 'Ed25519Signature2026' && proof.type !== 'Ed25519Signature2020') {
+  if (proof.type === 'Ed25519Signature2026' || proof.type === 'Ed25519Signature2020') {
+    throw new VerificationError(
+      'proof_type_legacy',
+      `${proof.type} is a legacy proof suite; Observer Protocol requires DataIntegrityProof with cryptosuite eddsa-jcs-2022`
+    )
+  }
+  if (proof.type !== 'DataIntegrityProof') {
     throw new VerificationError('proof_type_unsupported', 'unsupported proof.type: ' + proof.type)
+  }
+  if (proof.cryptosuite !== 'eddsa-jcs-2022') {
+    throw new VerificationError('proof_cryptosuite_unsupported', 'unsupported proof.cryptosuite: ' + proof.cryptosuite)
   }
   if (proof.proofPurpose !== 'assertionMethod') {
     throw new VerificationError('proof_purpose_invalid', 'proof.proofPurpose must be assertionMethod')
@@ -271,11 +294,27 @@ export function verifyCredentialProof (credential, didDocument) {
   }
   const publicKey = decodePublicKeyMultibase(vm.publicKeyMultibase)
   const signature = decodeSignatureMultibase(proof.proofValue)
-  const canonical = canonicalizeForSigning(credential)
-  const msgBytes = new TextEncoder().encode(canonical)
 
-  if (!ed25519.verify(signature, msgBytes, publicKey)) {
-    throw new VerificationError('signature_invalid', 'Ed25519 signature verification failed')
+  // proofConfig = proof block minus proofValue
+  const proofConfig = {}
+  for (const [k, v] of Object.entries(proof)) {
+    if (k !== 'proofValue') proofConfig[k] = v
+  }
+  // unsecuredDocument = credential minus proof
+  const docWithoutProof = {}
+  for (const [k, v] of Object.entries(credential)) {
+    if (k !== 'proof') docWithoutProof[k] = v
+  }
+
+  const enc = new TextEncoder()
+  const hashProofConfig = sha256(enc.encode(jcsCanonicalize(proofConfig)))
+  const hashDoc = sha256(enc.encode(jcsCanonicalize(docWithoutProof)))
+  const hashData = new Uint8Array(64)
+  hashData.set(hashProofConfig, 0)
+  hashData.set(hashDoc, 32)
+
+  if (!ed25519.verify(signature, hashData, publicKey)) {
+    throw new VerificationError('signature_invalid', 'eddsa-jcs-2022 signature verification failed')
   }
   return true
 }

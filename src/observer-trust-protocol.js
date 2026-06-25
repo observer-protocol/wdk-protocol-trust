@@ -352,8 +352,10 @@ export default class ObserverTrustProtocol extends TrustProtocol {
    * I/O-free per the Observer Protocol evaluator source-of-truth invariant.
    *
    * Delegates to the configured `PolicyGate`. The default {@link AdvisoryGate}
-   * runs `withinScope` client-side; a future `WdkPolicyHookGate` (post-WDK
-   * PR #55) will adapt to the in-WDK pre-sign hook.
+   * runs `withinScope` client-side, for rails with no native WDK engine. Where
+   * WDK PR #55 is available, enforcement is instead delegated to WDK and
+   * installed via `WdkEnforcementGate` (composing `@observer-protocol/wdk-op-policy`) —
+   * OP attests the outcome rather than re-deciding here (scope §6).
    *
    * @param {import('./mandate-types.js').ProposedAction} action
    * @param {import('./mandate-types.js').Mandate} mandate

@@ -9,13 +9,16 @@
 'use strict'
 
 import { ed25519 } from '@noble/curves/ed25519'
+import { sha256 } from '@noble/hashes/sha256'
 
 import {
   buildSettlementAttestation,
-  canonicalizeForSigning,
+  jcsCanonicalize,
   decodePublicKeyMultibase,
   decodeSignatureMultibase,
-  publicKeyMultibase
+  publicKeyMultibase,
+  PROOF_SUITE_TYPE,
+  PROOF_SUITE_CRYPTOSUITE
 } from '../index.js'
 
 function fixture () {
@@ -50,6 +53,24 @@ function fixture () {
   return { credential, action, settlement, attestationKey, publicKey }
 }
 
+// Recompute the eddsa-jcs-2022 hashData from a signed attestation so tests
+// can manually verify the signature without re-implementing buildSettlementAttestation.
+function attHashData (att) {
+  const proofConfig = {}
+  for (const [k, v] of Object.entries(att.proof)) {
+    if (k !== 'proofValue') proofConfig[k] = v
+  }
+  const docNoProof = {}
+  for (const [k, v] of Object.entries(att)) {
+    if (k !== 'proof') docNoProof[k] = v
+  }
+  const enc = new TextEncoder()
+  const hashData = new Uint8Array(64)
+  hashData.set(sha256(enc.encode(jcsCanonicalize(proofConfig))), 0)
+  hashData.set(sha256(enc.encode(jcsCanonicalize(docNoProof))), 32)
+  return hashData
+}
+
 describe('buildSettlementAttestation', () => {
   test('produces a signed envelope with the required shape', () => {
     const { credential, action, settlement, attestationKey } = fixture()
@@ -69,7 +90,8 @@ describe('buildSettlementAttestation', () => {
     expect(att.credentialSubject.action.rail).toBe('usdt_tron')
     expect(att.credentialSubject.action.amount).toEqual({ amount: '50', currency: 'USDT' })
     expect(att.credentialSubject.settlement).toEqual({ rail: 'usdt_tron', ref: '0xabcdef' })
-    expect(att.proof.type).toBe('Ed25519Signature2026')
+    expect(att.proof.type).toBe(PROOF_SUITE_TYPE)
+    expect(att.proof.cryptosuite).toBe(PROOF_SUITE_CRYPTOSUITE)
     expect(att.proof.proofValue.startsWith('z')).toBe(true)
   })
 
@@ -85,8 +107,7 @@ describe('buildSettlementAttestation', () => {
     })
 
     const sig = decodeSignatureMultibase(att.proof.proofValue)
-    const canonical = canonicalizeForSigning(att)
-    const ok = ed25519.verify(sig, new TextEncoder().encode(canonical), publicKey)
+    const ok = ed25519.verify(sig, attHashData(att), publicKey)
     expect(ok).toBe(true)
   })
 
@@ -101,11 +122,15 @@ describe('buildSettlementAttestation', () => {
       issuerDid: 'did:web:agent.example'
     })
 
+    const origHashData = attHashData(att)
     att.credentialSubject.action.amount.amount = '9999'
     const sig = decodeSignatureMultibase(att.proof.proofValue)
-    const canonical = canonicalizeForSigning(att)
-    const ok = ed25519.verify(sig, new TextEncoder().encode(canonical), publicKey)
-    expect(ok).toBe(false)
+    // Verify against the ORIGINAL hash (pre-tamper) to confirm signature bound to original content.
+    // The tampered hash would differ, so we check the original still verifies and tampered does not.
+    const okOriginal = ed25519.verify(sig, origHashData, publicKey)
+    const okTampered = ed25519.verify(sig, attHashData(att), publicKey)
+    expect(okOriginal).toBe(true)
+    expect(okTampered).toBe(false)
   })
 
   test('string settlement is normalised to {rail, ref}', () => {
@@ -134,8 +159,7 @@ describe('buildSettlementAttestation', () => {
     expect(att.credentialSubject.settlement.anchored).toEqual({ erc8004: '0xanchortxhash' })
     // And the signature still verifies (anchored was inside the signed body).
     const sig = decodeSignatureMultibase(att.proof.proofValue)
-    const canonical = canonicalizeForSigning(att)
-    expect(ed25519.verify(sig, new TextEncoder().encode(canonical), publicKey)).toBe(true)
+    expect(ed25519.verify(sig, attHashData(att), publicKey)).toBe(true)
   })
 })
 

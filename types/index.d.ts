@@ -1,0 +1,18 @@
+export { OpClient } from "./src/op-client.js";
+export { withinScope } from "./src/mandate.js";
+export { WdkEnforcementGate } from "./src/wdk-enforcement-gate.js";
+export { buildSettlementAttestation } from "./src/attestation.js";
+export type TrustProtocolConfig = import("./src/trust-protocol.js").TrustProtocolConfig;
+export type RegisterOptions = import("./src/trust-protocol.js").RegisterOptions;
+export type RegisterResult = import("./src/trust-protocol.js").RegisterResult;
+export type VerifyResult = import("./src/trust-protocol.js").VerifyResult;
+export type BilateralVerifyResult = import("./src/trust-protocol.js").BilateralVerifyResult;
+export type AttestPaymentOptions = import("./src/trust-protocol.js").AttestPaymentOptions;
+export type AttestPaymentResult = import("./src/trust-protocol.js").AttestPaymentResult;
+export { default, default as ObserverTrustProtocol } from "./src/observer-trust-protocol.js";
+export { default as TrustProtocol, ITrustProtocol, NotImplementedError } from "./src/trust-protocol.js";
+export { deriveEd25519Keypair, deriveAgentId, buildDid, buildDidDocument, publicKeyMultibase, signChallenge, verifySignature } from "./src/did-utils.js";
+export { DEFAULT_API_BASE, DEFAULT_DID_DERIVATION_PATH, DEFAULT_REQUEST_TIMEOUT_MS, DEFAULT_TRUSTED_ISSUERS, DID_PREFIX, VERIFICATION_METHOD_TYPE } from "./src/config.js";
+export { SCHEMA_ALLOWLIST, isAllowedSchema } from "./src/schema-allowlist.js";
+export { PolicyGate, AdvisoryGate } from "./src/policy-gate.js";
+export { VerificationError, verifyMandate, canonicalizeForSigning, resolveDidWeb, verifyCredentialProof, findAssertionMethod, decodePublicKeyMultibase, decodeSignatureMultibase, base58Decode } from "./src/credential-verify.js";

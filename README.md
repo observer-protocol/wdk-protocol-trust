@@ -4,6 +4,9 @@
 
 **Note**: This package is currently in beta (`0.2.0-beta.1`). The earlier handshake methods (`register`, `verify(alias)`, `bilateralVerify`, `attestPayment`) ship alongside the AIP v0.8 mandate surface (`verifyMandate`, `withinScope`, `attest`, `PolicyGate`) added in this release. The underlying protocol (AIP v0.8 draft-1) is itself pre-1.0. Test thoroughly in development before production use.
 
+> [!IMPORTANT]
+> **Reference use & security.** This module is the reusable trust layer composed by the [`at-reference-wallet`](../at-reference-wallet) reference implementation. It is self-custodial by design — it verifies and attests, it never holds keys or moves funds. It is **not audited for production**; audit before any mainnet use with real funds. Enforcement is delegated to WDK (PR #55) via `WdkEnforcementGate`; OP attests the outcome and never re-decides policy per trade.
+
 ---
 
 ## Why this exists
@@ -67,7 +70,7 @@ These are load-bearing — they shape the API and they shape what this adapter w
 - **Same-currency amount checks only.** A currency mismatch is a deny with reason, never a conversion. Per-rail ceilings follow naturally — each rail's natural unit differs.
 - **Per-transaction ceiling is the only binding amount check.** `cumulative_budget` is **advisory only** in v0.8: declared in the credential, surfaced in the verifier result, never grounds a deny. Same for `allowed_counterparty_types` and `geographic_restriction` — reserved with constrained shapes and explicit advisory normative status, until the substrate source-of-truth for each is defined.
 - **Schema allowlist, not arbitrary fetch.** This adapter recognises `credentialSchema.id = https://observerprotocol.org/schemas/delegation/v2.1.json`. Unknown URLs are rejected; the adapter does not fetch arbitrary schema URLs. The earlier `v2.json` URL (frozen at AIP v0.7-era content for the maxi-0001 demo) is **deliberately excluded** — its older `cumulative_ceiling` / `period` vocabulary does not match this adapter's logic. See `SCHEMA_POLICY.md` in `observer-protocol/aip` for the schema immutability policy.
-- **`PolicyGate` is the seam to Tether WDK PR #55.** The default `AdvisoryGate` runs `withinScope` client-side — the developer's `throw` gates the call. `WdkPolicyHookGate` is stubbed until PR #55 (or its successor) lands and the in-WDK pre-sign hook is final; at that point the gate will honour the decision inside the WDK transaction path itself.
+- **OP attests, WDK enforces.** Where Tether WDK's native transaction-policy engine (PR #55) is present, `WdkEnforcementGate` installs it via [`@observer-protocol/wdk-op-policy`](https://www.npmjs.com/package/@observer-protocol/wdk-op-policy) — an ALLOW + DENY rule pair WDK evaluates inside its own signing path, fail-closed, before the key signs. OP does **not** re-decide policy per trade; it verifies the signed delegation credential and attests the outcome (a signed `PolicyEvaluationCredential`). The `AdvisoryGate` (`withinScope` client-side, gated by the developer's `throw`) remains a fallback for rails with no native WDK engine.
 
 ### `verifyMandate(credential, opts?)`
 
@@ -255,7 +258,7 @@ Returns:
   did: string              // did:web:... of the resolved counterparty
   didDocument: object      // W3C DID document
   vac: object              // Verifiable Attestation Certificate (VAC) summary
-  trustScore?: object      // Composite AT-ARS score (if available)
+  trustScore?: object      // Composite reputation / trust score (if available)
 }
 ```
 

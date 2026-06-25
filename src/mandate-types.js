@@ -151,11 +151,12 @@
  */
 
 /**
- * PolicyGate is the seam to Tether's WDK pre-sign policy hook (PR #55). It
- * is intentionally minimal: a single `evaluate(action, mandate)` method that
- * returns a decision. The default `AdvisoryGate` runs `withinScope`
- * client-side; the post-#55 `WdkPolicyHookGate` will adapt to WDK's hook so
- * the decision is honored inside WDK's transaction path.
+ * PolicyGate is the local-decisioning seam: a single `evaluate(action,
+ * mandate)` method returning a decision. The default `AdvisoryGate` runs
+ * `withinScope` client-side, for rails with no native WDK engine. Where WDK
+ * PR #55 is present, enforcement is instead delegated to WDK and installed via
+ * `WdkEnforcementGate` (composing `@observer-protocol/wdk-op-policy`); OP
+ * attests the outcome rather than re-deciding here.
  *
  * @typedef {object} PolicyGate
  * @property {(action: ProposedAction, mandate: Mandate) => Promise<Decision> | Decision} evaluate

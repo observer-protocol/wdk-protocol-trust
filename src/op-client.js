@@ -133,7 +133,7 @@ export class OpClient {
   }
 
   /**
-   * Get an agent's composite trust score (AT-ARS).
+   * Get an agent's composite reputation / trust score from the OP API.
    *
    * @param {string} agentId - Agent identifier.
    * @returns {Promise<Record<string,unknown>>}

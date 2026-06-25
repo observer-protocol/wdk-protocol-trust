@@ -11,7 +11,8 @@
 import { ed25519 } from '@noble/curves/ed25519'
 import { sha256 } from '@noble/hashes/sha256'
 
-import { canonicalizeForSigning } from './credential-verify.js'
+import { canonicalizeForSigning, jcsCanonicalize } from './credential-verify.js'
+import { PROOF_SUITE_TYPE, PROOF_SUITE_CRYPTOSUITE } from './proof.js'
 
 const PKG_VERSION = '0.2.0-beta.1'
 
@@ -32,8 +33,8 @@ const PKG_VERSION = '0.2.0-beta.1'
  *   - a timestamp
  *
  * The whole envelope is signed by the agent's attestation key using
- * Ed25519Signature2026 over canonicalized bytes (same sort-keys + compact
- * JSON algorithm used for delegation signing).
+ * DataIntegrityProof / eddsa-jcs-2022 (SHA-256(JCS(proofConfig)) ‖
+ * SHA-256(JCS(unsecuredDocument)), Ed25519).
  *
  * This is the centerpiece surface from the WDK implementation brief: a
  * portable, anchored attestation binding *this* agent to *this* scoped
@@ -109,15 +110,21 @@ export function buildSettlementAttestation (args) {
     }
   }
 
-  const canonical = canonicalizeForSigning(envelope)
-  const sigBytes = ed25519.sign(new TextEncoder().encode(canonical), attestationKey)
-  envelope.proof = {
-    type: 'Ed25519Signature2026',
+  const proofConfig = {
+    type: PROOF_SUITE_TYPE,
+    cryptosuite: PROOF_SUITE_CRYPTOSUITE,
     created: nowIso,
     verificationMethod,
-    proofPurpose: 'assertionMethod',
-    proofValue: 'z' + _base58Encode(sigBytes)
+    proofPurpose: 'assertionMethod'
   }
+  const enc = new TextEncoder()
+  const hashProofConfig = sha256(enc.encode(jcsCanonicalize(proofConfig)))
+  const hashDoc = sha256(enc.encode(jcsCanonicalize(envelope)))
+  const hashData = new Uint8Array(64)
+  hashData.set(hashProofConfig, 0)
+  hashData.set(hashDoc, 32)
+  const sigBytes = ed25519.sign(hashData, attestationKey)
+  envelope.proof = { ...proofConfig, proofValue: 'z' + _base58Encode(sigBytes) }
   return envelope
 }
 

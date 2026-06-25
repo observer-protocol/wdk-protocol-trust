@@ -39,10 +39,11 @@ export class PolicyGate {
  * Default gate: runs `withinScope` client-side and returns the decision.
  *
  * Honest label: the developer's `if (!decision.allow) throw …` is what
- * actually gates the WDK transaction. The signing path itself is not
- * intercepted — that requires the WDK PR #55 hook (`WdkPolicyHookGate`).
- * For agents that fully control their own send-call ordering (the common
- * case today), this is sufficient.
+ * actually gates the transaction. The signing path itself is not intercepted —
+ * that requires WDK's native policy engine (PR #55), composed via
+ * `WdkEnforcementGate`. Use `AdvisoryGate` only as a fallback for rails with no
+ * native WDK engine, or for agents that fully control their own send-call
+ * ordering.
  */
 export class AdvisoryGate extends PolicyGate {
   /**
@@ -55,31 +56,12 @@ export class AdvisoryGate extends PolicyGate {
   }
 }
 
-/**
- * Post-#55 gate: adapts to Tether WDK's pre-sign policy-hook API so the
- * decision is honored inside WDK's signing path itself.
- *
- * STUB. The exact shape of WDK's hook is not yet final — implementing
- * against a guessed signature would be throwaway. Concrete implementation
- * lands when PR #55 (or its successor) merges. Until then, use
- * `AdvisoryGate` and gate at the call site.
- *
- * Reference: observer-protocol/aip discussion of the PolicyGate seam in the
- * WDK implementation brief.
- */
-export class WdkPolicyHookGate extends PolicyGate {
-  /**
-   * @param {ProposedAction} _action
-   * @param {Mandate} _mandate
-   * @returns {Decision}
-   */
-  evaluate (_action, _mandate) {
-    throw new NotImplementedError(
-      'WdkPolicyHookGate is a stub awaiting Tether WDK PR #55. ' +
-      'Use AdvisoryGate (the default) until the WDK policy-hook interface lands.'
-    )
-  }
-}
+// Post-#55 enforcement is delegated to Tether WDK's native transaction-policy
+// engine (PR #55), composed via `@observer-protocol/wdk-op-policy`. That gate
+// lives in `wdk-enforcement-gate.js` as `WdkEnforcementGate` — it INSTALLS the
+// WDK rule pair (it does not re-decide policy in OP code; see scope §6). The
+// abstract `PolicyGate.evaluate` seam here exists for the `AdvisoryGate`
+// fallback only, used where a rail has no native WDK engine.
 
 export class NotImplementedError extends Error {
   /** @param {string} [message] */

@@ -9,13 +9,16 @@
 'use strict'
 
 import { ed25519 } from '@noble/curves/ed25519'
+import { sha256 } from '@noble/hashes/sha256'
 
 import {
   verifyMandate,
-  canonicalizeForSigning,
+  jcsCanonicalize,
   publicKeyMultibase,
   SCHEMA_ALLOWLIST,
-  VerificationError
+  VerificationError,
+  PROOF_SUITE_TYPE,
+  PROOF_SUITE_CRYPTOSUITE
 } from '../index.js'
 
 // Build a credential signed by a freshly-generated key pair, and a matching
@@ -59,15 +62,21 @@ function buildSignedCredential ({ schemaId, validFrom, validUntil } = {}) {
     }
   }
 
-  const canonical = canonicalizeForSigning(credential)
-  const sig = ed25519.sign(new TextEncoder().encode(canonical), privateKey)
-  credential.proof = {
-    type: 'Ed25519Signature2026',
+  const proofConfig = {
+    type: PROOF_SUITE_TYPE,
+    cryptosuite: PROOF_SUITE_CRYPTOSUITE,
     created: '2026-01-01T00:00:00Z',
     verificationMethod: vmId,
-    proofPurpose: 'assertionMethod',
-    proofValue: 'z' + base58btcEncode(sig)
+    proofPurpose: 'assertionMethod'
   }
+  const enc = new TextEncoder()
+  const hashProofConfig = sha256(enc.encode(jcsCanonicalize(proofConfig)))
+  const hashDoc = sha256(enc.encode(jcsCanonicalize(credential)))
+  const hashData = new Uint8Array(64)
+  hashData.set(hashProofConfig, 0)
+  hashData.set(hashDoc, 32)
+  const sig = ed25519.sign(hashData, privateKey)
+  credential.proof = { ...proofConfig, proofValue: 'z' + base58btcEncode(sig) }
 
   const didDocument = {
     '@context': ['https://www.w3.org/ns/did/v1'],

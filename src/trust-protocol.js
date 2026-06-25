@@ -39,7 +39,7 @@
  * @property {string} did - DID resolved for the alias.
  * @property {Record<string,unknown>} didDocument - W3C DID document.
  * @property {Record<string,unknown>} vac - VAC summary (verified agent credential).
- * @property {Record<string,unknown>} [trustScore] - AT-ARS trust score breakdown.
+ * @property {Record<string,unknown>} [trustScore] - reputation / trust score breakdown.
  */
 
 /**

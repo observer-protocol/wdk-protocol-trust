@@ -34,7 +34,19 @@
   },
   "peerDependencies": {
     "@tetherto/wdk-wallet": "^1.0.0-beta.7",
-    "@tetherto/wdk-wallet-evm": "^1.0.0-beta.8"
+    "@tetherto/wdk-wallet-evm": "^1.0.0-beta.8",
+    "@observer-protocol/wdk-op-policy": ">=0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@tetherto/wdk-wallet": {
+      "optional": true
+    },
+    "@tetherto/wdk-wallet-evm": {
+      "optional": true
+    },
+    "@observer-protocol/wdk-op-policy": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@noble/curves": "^1.6.0",

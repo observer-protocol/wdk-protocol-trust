@@ -70,3 +70,9 @@ export { signDocument, verifyDocument, PROOF_SUITE_TYPE, PROOF_SUITE_CRYPTOSUITE
 
 // ── delegation schema constant ────────────────────────────────────────────
 export { DELEGATION_SCHEMA_V2_1 } from './src/config.js'
+
+// ── community BIND→LINK→AUTHORIZE gate ───────────────────────────────────
+// The canonical community RuntimeAdapter. Evaluates agent-stated spend intent
+// against a signed SpendMandate, optionally verifying a WalletBindingCredential.
+// hermes-gate's SpendGate is a thin wrapper around this function.
+export { runRuntimeAdapter } from './src/runtime-adapter.js'

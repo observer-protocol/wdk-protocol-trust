@@ -8,19 +8,16 @@
 
 'use strict'
 
-import { canonicalizeForSigning, verifyCredentialProof } from './credential-verify.js'
+import { sha256 } from '@noble/hashes/sha256'
+import { jcsCanonicalize, verifyCredentialProof } from './credential-verify.js'
 
 /**
- * @file Proof helpers for the OP shared trust core.
- *
- * Signs and verifies JSON documents using the same proof convention as the
- * umbrella's settlement attestation, so they round-trip with `verifyCredentialProof`:
- *
- *   - canonicalize with `canonicalizeForSigning` (sorted-key JCS),
- *   - Ed25519-sign the canonical bytes with the agent's `did:key`,
- *   - attach a `proof` block: type `Ed25519Signature2026`,
- *     `proofValue = 'z' + base58btc(signature)`, `verificationMethod = agent.keyId`.
+ * Canonical proof suite identifiers for Observer Protocol.
+ * Import these wherever a proof type or cryptosuite string is needed —
+ * never hardcode the literals.
  */
+export const PROOF_SUITE_TYPE = 'DataIntegrityProof'
+export const PROOF_SUITE_CRYPTOSUITE = 'eddsa-jcs-2022'
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 
@@ -46,31 +43,54 @@ function base58btcEncode (bytes) {
 }
 
 /**
- * Sign a JSON document, returning a copy with a `proof` block attached.
+ * Sign a JSON document using DataIntegrityProof / eddsa-jcs-2022.
+ *
+ * Hash construction (W3C VC Data Integrity EdDSA Cryptosuites §3.3):
+ *   hashData = SHA-256(JCS(proofConfig)) ‖ SHA-256(JCS(unsecuredDocument))
+ *   signature = ed25519.sign(hashData, privateKey)
  *
  * @param {Record<string, unknown>} doc - The unsigned document.
- * @param {{ sign: (msg: string) => string, keyId: string }} agent - A `did:key`
- *   agent (see `createDidKeyAgent`).
+ * @param {{ sign: (msg: Uint8Array | string) => string, keyId: string }} agent
+ *   A `did:key` agent (see `createDidKeyAgent`). `sign` must accept a Uint8Array.
  * @returns {Record<string, unknown>} The signed document.
  */
 export function signDocument (doc, agent) {
-  const canonical = canonicalizeForSigning(doc)
-  const sigHex = agent.sign(canonical)
+  const created = new Date().toISOString().replace(/\.\d+Z$/, 'Z')
+
+  const proofConfig = {
+    type: PROOF_SUITE_TYPE,
+    cryptosuite: PROOF_SUITE_CRYPTOSUITE,
+    created,
+    verificationMethod: agent.keyId,
+    proofPurpose: 'assertionMethod'
+  }
+
+  const docWithoutProof = {}
+  for (const [k, v] of Object.entries(doc)) {
+    if (k !== 'proof') docWithoutProof[k] = v
+  }
+
+  const enc = new TextEncoder()
+  const hashProofConfig = sha256(enc.encode(jcsCanonicalize(proofConfig)))
+  const hashDoc = sha256(enc.encode(jcsCanonicalize(docWithoutProof)))
+  const hashData = new Uint8Array(64)
+  hashData.set(hashProofConfig, 0)
+  hashData.set(hashDoc, 32)
+
+  const sigHex = agent.sign(hashData)
   const proofValue = 'z' + base58btcEncode(hexToBytes(sigHex))
+
   return {
     ...doc,
     proof: {
-      type: 'Ed25519Signature2026',
-      created: doc.issuanceDate || doc.created || undefined,
-      verificationMethod: agent.keyId,
-      proofPurpose: 'assertionMethod',
+      ...proofConfig,
       proofValue
     }
   }
 }
 
 /**
- * Verify a signed document against a DID document, via `verifyCredentialProof`.
+ * Verify a signed document against a DID document.
  *
  * @param {Record<string, unknown>} signedDoc
  * @param {Record<string, unknown>} didDocument
