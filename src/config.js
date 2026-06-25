@@ -75,3 +75,18 @@ export const DEFAULT_TRUSTED_ISSUERS = Object.freeze([
  * @type {string}
  */
 export const DELEGATION_SCHEMA_V2_1 = 'https://observerprotocol.org/schemas/delegation/v2.1.json'
+
+/**
+ * Ed25519 key derivation paths for the three OP roles in a community install.
+ *
+ * These paths are consumed by createDidKeyAgent(seed, path) on both the
+ * bootstrap side (key generation) and the wallet-service side (DID derivation
+ * from the stored seed). The WBC binds the wallet DID that results from
+ * WALLET; if the path ever changes, the binding silently points at the wrong
+ * address. Always import from here — never hardcode the literals.
+ *
+ * @type {string}
+ */
+export const BOOTSTRAP_PATH_PRINCIPAL = "m/observer-protocol'/principal/0/0/0"
+export const BOOTSTRAP_PATH_AGENT = "m/observer-protocol'/agent/0/0/0"
+export const BOOTSTRAP_PATH_WALLET = "m/observer-protocol'/wallet/0/0/0"

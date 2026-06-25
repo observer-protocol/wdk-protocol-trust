@@ -35,7 +35,10 @@ export {
   DEFAULT_REQUEST_TIMEOUT_MS,
   DEFAULT_TRUSTED_ISSUERS,
   DID_PREFIX,
-  VERIFICATION_METHOD_TYPE
+  VERIFICATION_METHOD_TYPE,
+  BOOTSTRAP_PATH_PRINCIPAL,
+  BOOTSTRAP_PATH_AGENT,
+  BOOTSTRAP_PATH_WALLET
 } from './src/config.js'
 
 // ── AIP v0.8 mandate surface ──────────────────────────────────────────────
@@ -46,6 +49,7 @@ export { WdkEnforcementGate } from './src/wdk-enforcement-gate.js'
 export {
   VerificationError,
   verifyMandate,
+  jcsCanonicalize,
   canonicalizeForSigning,
   resolveDidWeb,
   verifyCredentialProof,
@@ -59,8 +63,10 @@ export { buildSettlementAttestation } from './src/attestation.js'
 // ── did:key creation and document building ────────────────────────────────
 export { createDidKeyAgent, buildDidKeyDocument } from './src/did-key.js'
 
-// ── document signing and verification (Ed25519Signature2026 / JCS) ────────
-export { signDocument, verifyDocument } from './src/proof.js'
+// ── document signing and verification (DataIntegrityProof / eddsa-jcs-2022) ─
+// PROOF_SUITE_TYPE / PROOF_SUITE_CRYPTOSUITE are the canonical suite identifiers.
+// Import and use them; never hardcode the literal strings.
+export { signDocument, verifyDocument, PROOF_SUITE_TYPE, PROOF_SUITE_CRYPTOSUITE } from './src/proof.js'
 
 // ── delegation schema constant ────────────────────────────────────────────
 export { DELEGATION_SCHEMA_V2_1 } from './src/config.js'
