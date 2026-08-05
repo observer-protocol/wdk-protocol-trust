@@ -1,3 +1,14 @@
+> # ARCHIVED. **No further version of `@observer-protocol/wdk-protocol-trust` is coming.**
+>
+> The published `0.2.0-beta.3` remains installable and **nothing was unpublished** — anything you
+> already installed still verifies, and this repository stays public so the package's `repository`
+> link keeps resolving and its `gitHead` still resolves against this history.
+>
+> It stopped at beta. Note that its declared dependency on `@observer-protocol/wdk-op-policy` is
+> `">=0.1.0,<0.3"`, a range that **excludes** that package's published `0.4.x`, so the two were never
+> in use together. Current WDK enforcement lives in
+> [`op-adapters/packages/wdk-op-policy`](https://github.com/observer-protocol/op-adapters/tree/main/packages/wdk-op-policy).
+
 # @observer-protocol/wdk-protocol-trust
 
 > WDK protocol module: agent identity, bilateral trust handshake, AIP v0.8 spending-mandate verification, and ERC-8004-anchored settlement attestation via Observer Protocol.
