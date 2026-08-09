@@ -30,7 +30,8 @@
     "lint:fix": "standard --fix",
     "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
     "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --coverage",
-    "example": "node examples/full-flow.mjs"
+    "example": "node examples/full-flow.mjs",
+    "prepublishOnly": "bash scripts/prepublish-check.sh"
   },
   "peerDependencies": {
     "@tetherto/wdk-wallet": "^1.0.0-beta.7",
